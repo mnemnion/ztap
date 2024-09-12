@@ -15,7 +15,7 @@ former case.
 Add to `build.zig.zon` in the usual fashion:
 
 ```sh
-zig fetch --save "https://github.com/mnemnion/ztap/archive/refs/tags/v0.8.0.tar.gz"
+zig fetch --save "https://github.com/mnemnion/ztap/archive/refs/tags/v0.8.1.tar.gz"
 ```
 You'll need a test runner à la `src/ztap-runner.zig`:
 
