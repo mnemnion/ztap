@@ -14,6 +14,12 @@ const std = @import("std");
 pub const ZTapTodo = error.ZTapTodo;
 const SkipZigTest = error.SkipZigTest;
 
+var current_test: ?[]const u8 = null;
+
+/// ZTAP test producer.  Call with `ztap_test(builtin)` in the main
+/// function of a test executable, followed by `std.process.exit(0)`.
+/// Set `pub fn panic = ztap.ztap_panic` for TAP-compatible bailout
+/// behavior.
 pub fn ztap_test(builtin: anytype) void {
     const stdout = std.io.getStdOut().writer();
     // Version string.
@@ -33,6 +39,7 @@ pub fn ztap_test(builtin: anytype) void {
     // Plan:
     stdout.print("1..{d}\n", .{builtin.test_functions.len}) catch {};
     for (builtin.test_functions, 1..) |t, i| {
+        current_test = t.name;
         std.testing.allocator_instance = .{};
         const result = t.func();
         if (std.testing.allocator_instance.deinit() == .leak) {
@@ -53,4 +60,20 @@ pub fn ztap_test(builtin: anytype) void {
             },
         }
     }
+    current_test = null;
+}
+
+/// Panic handler.  Provides Bail out! directive before calling
+/// the default panic handler.
+pub fn ztap_panic(
+    message: []const u8,
+    error_return_trace: ?*std.builtin.StackTrace,
+    ret_addr: ?usize,
+) noreturn {
+    const stdout = std.io.getStdOut().writer();
+    std.debug.print("panic! at the ztap\n", .{});
+    const current = if (current_test != null) current_test else "pre/post";
+    stdout.print("# panic in {s}: {s}\n", .{ current, message }) catch {};
+    _ = stdout.writeAll("Bail out!\n") catch 0;
+    return std.builtin.default_panic(message, error_return_trace, ret_addr);
 }
