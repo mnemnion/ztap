@@ -15,7 +15,7 @@ former case.
 Add to `build.zig.zon` in the usual fashion:
 
 ```sh
-zig fetch --save "http://github.com/mnemnion/ztap/etc"
+zig fetch --save "https://github.com/mnemnion/ztap/archive/refs/tags/v0.8.0.tar.gz"
 ```
 You'll need a test runner à la `src/ztap-runner.zig`:
 
@@ -39,7 +39,7 @@ a test failure.
 Add something of this nature to `build.zig`:
 
 ```zig
-    // ZTap test runner step.
+    // ZTAP test runner step.
     const ztap_unit_tests = b.addTest(.{
         .root_source_file = b.path("src/test-root-file.zig"),
         .target = target,
