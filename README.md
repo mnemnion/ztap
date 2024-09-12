@@ -41,11 +41,15 @@ Add something of this nature to `build.zig`:
 ```zig
     // ZTAP test runner step.
     const ztap_unit_tests = b.addTest(.{
+        .name = "ztap-run",
         .root_source_file = b.path("src/test-root-file.zig"),
         .target = target,
         .optimize = optimize,
         .test_runner = b.path("src/ztap-runner.zig"),
     });
+
+    // To put the runner in zig-out etc.
+    b.installArtifact(ztap_unit_tests);
 
     const run_ztap_tests = b.addRunArtifact(ztap_unit_tests);
 
