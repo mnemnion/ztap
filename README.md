@@ -52,10 +52,6 @@ Add something of this nature to `build.zig`:
     // To unilaterally run tests, add this:
     run_ztap_tests.has_side_effects = true;
 
-    // Workaround for something which currently causes a bunch of
-    // blank stderr lines.  ¯\_(ツ)_/¯
-    _ = run_ztap_tests.captureStdErr();
-
     if (b.lazyDependency("ztap", .{
         .target = target,
         .optimize = optimize,
@@ -104,4 +100,3 @@ Also, if you print to `stdout`, ZTAP will not hang your unit tests.  That
 doesn't make it a good idea, TAP harnesses ignore what they don't grok,
 but it can't help things, and it can screw them up.  It does mean that
 tests will complete in the event that `stdout` is printed to.
-
