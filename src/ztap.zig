@@ -47,20 +47,45 @@ pub fn ztap_test(builtin: anytype) void {
             continue;
         }
         if (result) |_| {
-            stdout.print("ok {d} - {s}\n", .{ i, t.name }) catch {};
+            stdout.print("ok {d} - ", .{i}) catch {};
+            esc_print(stdout, t.name);
+            stdout.writeByte('\n') catch {};
         } else |err| switch (err) {
             SkipZigTest => {
-                stdout.print("not ok {d} - {s} # Skip\n", .{ i, t.name }) catch {};
+                stdout.print("not ok {d} - ", .{i}) catch {};
+                esc_print(stdout, t.name);
+                stdout.writeAll(" # Skip\n") catch {};
             },
             ZTapTodo => {
-                stdout.print("not ok {d} - {s} # Todo\n", .{ i, t.name }) catch {};
+                stdout.print("not ok {d} - ", .{i}) catch {};
+                esc_print(stdout, t.name);
+                stdout.writeAll(" # Todo\n") catch {};
             },
             else => {
-                stdout.print("not ok {d} - {s}: {any}\n", .{ i, t.name, err }) catch {};
+                stdout.print("not ok {d} - ", .{i}) catch {};
+                esc_print(stdout, t.name);
+                // Error names aren't going to have escapables in them.
+                stdout.print(": {any}\n", .{err}) catch {};
             },
         }
     }
     current_test = null;
+}
+
+fn esc_print(stdout: anytype, msg: []const u8) void {
+    var cursor: usize = 0;
+    var idx: usize = 0;
+    while (idx < msg.len) : (idx += 1) {
+        switch (msg[idx]) {
+            '\\', '#' => {
+                stdout.writeAll(msg[cursor..idx]) catch {};
+                stdout.writeByte('\\') catch {};
+                cursor = idx;
+            },
+            else => {},
+        }
+    }
+    stdout.writeAll(msg[cursor..idx]) catch {};
 }
 
 /// Panic handler.  Provides Bail out! directive before calling
