@@ -27,7 +27,7 @@ pub fn ztap_test(builtin: anytype) void {
     // Make sure we have tests to run.
     const builtin_info = @typeInfo(builtin);
     switch (builtin_info) {
-        .Struct => {
+        .@"struct" => {
             if (!@hasDecl(builtin, "test_functions")) {
                 // Empty plan.
                 _ = stdout.writeAll("1..0\n") catch 0;
