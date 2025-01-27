@@ -100,5 +100,5 @@ pub fn ztap_panic(
     const current = if (current_test != null) current_test.? else "pre/post";
     stdout.print("# panic in {s}: {s}\n", .{ current, message }) catch {};
     _ = stdout.writeAll("Bail out!\n") catch 0;
-    return std.builtin.default_panic(message, error_return_trace, ret_addr);
+    return std.debug.FormattedPanic.call(message, error_return_trace, ret_addr);
 }

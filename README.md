@@ -6,6 +6,10 @@ venerable, and widely-used format for reporting the output of tests.
 ZTAP is a Zig library for running and reporting tests in the TAP 14
 format.
 
+## Compatibility
+
+ZTAP requires Zig 0.14 master.
+
 ## Use
 
 This can be used as the main unit testing step, or as a custom step.
@@ -15,7 +19,7 @@ former case.
 Add to `build.zig.zon` in the usual fashion:
 
 ```sh
-zig fetch --save "https://github.com/mnemnion/ztap/archive/refs/tags/v0.8.1.tar.gz"
+zig fetch --save "https://github.com/mnemnion/ztap/archive/refs/tags/v0.8.2.tar.gz"
 ```
 You'll need a test runner à la `src/ztap-runner.zig`:
 
