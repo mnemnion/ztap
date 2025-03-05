@@ -1,6 +1,8 @@
 // Zig package metadata for {project_name}
 .{
-    .name = "ztap",
+    .name = .ztap,
+
+    .fingerprint = 0x5add74b25384ca8a,
 
     .version = "0.8.2",
 
