@@ -8,7 +8,7 @@ format.
 
 ## Compatibility
 
-ZTAP requires Zig 0.14 master.
+ZTAP requires Zig 0.14.
 
 ## Use
 
@@ -19,7 +19,7 @@ former case.
 Add to `build.zig.zon` in the usual fashion:
 
 ```sh
-zig fetch --save "https://github.com/mnemnion/ztap/archive/refs/tags/v0.8.2.tar.gz"
+zig fetch --save "https://github.com/mnemnion/ztap/archive/refs/tags/v0.9.0.tar.gz"
 ```
 You'll need a test runner à la `src/ztap-runner.zig`:
 
@@ -29,7 +29,7 @@ const builtin = @import("builtin");
 const ztap = @import("ztap");
 
 // This gives TAP-compatible panic handling
-pub const panic = ztap.ztap_panic;
+pub const panic = std.debug.FullPanic(ztap.ztap_panic);
 
 pub fn main() !void {
     ztap.ztap_test(builtin);
@@ -49,7 +49,7 @@ Add something of this nature to `build.zig`:
         .root_source_file = b.path("src/test-root-file.zig"),
         .target = target,
         .optimize = optimize,
-        .test_runner = b.path("src/ztap-runner.zig"),
+        .test_runner = .{ .path = b.path("src/ztap-runner.zig"), .mode = .simple },
     });
 
     // To put the runner in zig-out etc.

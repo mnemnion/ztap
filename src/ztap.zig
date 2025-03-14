@@ -92,7 +92,6 @@ fn esc_print(stdout: anytype, msg: []const u8) void {
 /// the default panic handler.
 pub fn ztap_panic(
     message: []const u8,
-    error_return_trace: ?*std.builtin.StackTrace,
     ret_addr: ?usize,
 ) noreturn {
     const stdout = std.io.getStdOut().writer();
@@ -100,5 +99,5 @@ pub fn ztap_panic(
     const current = if (current_test != null) current_test.? else "pre/post";
     stdout.print("# panic in {s}: {s}\n", .{ current, message }) catch {};
     _ = stdout.writeAll("Bail out!\n") catch 0;
-    return std.debug.FormattedPanic.call(message, error_return_trace, ret_addr);
+    std.debug.defaultPanic(message, ret_addr);
 }
