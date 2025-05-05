@@ -49,7 +49,7 @@ Add something of this nature to `build.zig`:
         .root_source_file = b.path("src/test-root-file.zig"),
         .target = target,
         .optimize = optimize,
-        .test_runner = .{ .path = b.path("src/ztap-runner.zig"), .mode = .simple },
+        .test_runner = .{ .path = b.path("src/ztap_runner.zig"), .mode = .simple },
     });
 
     // To put the runner in zig-out etc.
@@ -59,6 +59,12 @@ Add something of this nature to `build.zig`:
 
     // To unilaterally run tests, add this:
     run_ztap_tests.has_side_effects = true;
+
+    // TAP producers write to stdout.
+    //
+    // To suppress stderr chatter, you can uncomment this:
+
+    // _ = run_ztap_tests.captureStdErr();
 
     if (b.lazyDependency("ztap", .{
         .target = target,
