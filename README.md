@@ -19,9 +19,9 @@ former case.
 Add to `build.zig.zon` in the usual fashion:
 
 ```sh
-zig fetch --save "https://github.com/mnemnion/ztap/archive/refs/tags/v0.9.0.tar.gz"
+zig fetch --save "https://github.com/mnemnion/ztap/archive/refs/tags/v0.9.1.tar.gz"
 ```
-You'll need a test runner à la `src/ztap-runner.zig`:
+You'll need a test runner.  A default one is included, and looks like this:
 
 ```zig
 const std = @import("std");
@@ -36,29 +36,49 @@ pub fn main() !void {
     std.process.exit(0);
 }
 ```
+Which you could customize, on the off chance that you need that.
 
 Do be sure to exit with `0`, since the protocol interprets non-zero as
 a test failure.
 
-Add something of this nature to `build.zig`:
+Next, set up your `build.zig`.  We'll assume you want to use the
+default test runner, and make this a custom step.
 
 ```zig
+    // If you want to filter tests, add this.  It works with the stock
+    // unit test runner as well.
+    const test_filters: []const []const u8 = b.option(
+        []const []const u8,
+        "test-filter",
+        "Skip tests that do not match any of the specified filters",
+    ) orelse &.{};
+
+    const ztap_dep = b.dependency("ztap", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
     // ZTAP test runner step.
     const ztap_unit_tests = b.addTest(.{
         .name = "ztap-run",
         .root_source_file = b.path("src/test-root-file.zig"),
         .target = target,
         .optimize = optimize,
-        .test_runner = .{ .path = b.path("src/ztap_runner.zig"), .mode = .simple },
+        .filters = test_filters,
+        // With the provided test runner:
+        .test_runner = .{ .path = ztap_dep.namedLazyPath("runner"), .mode = .simple},
+        // Or you can use your own:
+        // .test_runner = .{ .path = b.path("src/ztap_custom_runner.zig"), .mode = .simple },
     });
+    ztap_unit_tests.root_module.addImport("ztap", ztap_dep.module("ztap"));
 
     // To put the runner in zig-out etc.
     b.installArtifact(ztap_unit_tests);
 
     const run_ztap_tests = b.addRunArtifact(ztap_unit_tests);
 
-    // To unilaterally run tests, add this:
-    run_ztap_tests.has_side_effects = true;
+    // To always run tests, even if nothing changed, add this:
+    // run_ztap_tests.has_side_effects = true;
 
     // TAP producers write to stdout.
     //
@@ -66,15 +86,11 @@ Add something of this nature to `build.zig`:
 
     // _ = run_ztap_tests.captureStdErr();
 
-    if (b.lazyDependency("ztap", .{
-        .target = target,
-        .optimize = optimize,
-    })) |ztap_dep| {
-        ztap_unit_tests.root_module.addImport("ztap", ztap_dep.module("ztap"));
-    }
-
+    // Just call this "test" to make ZTAP the main test runner.
     const ztap_step = b.step("ztap", "Run tests with ZTAP");
     ztap_step.dependOn(&run_ztap_tests.step);
+    // Otherwise you can set up default tests as well, in the
+    // expected manner.  It's nice to have options.
 ```
 That should do the trick.  See the first link for an example of what to
 expect in the way of output.
@@ -96,13 +112,23 @@ accustomed things using `stderr`.
 
 ## Roadmap
 
-ZTAP does what it needs to.  My intention is to use it (use by others
-is encouraged as well) until I'm fairly convinced it does nothing weird
-or untoward, or until six months have passed, whichever is longer.
+ZTAP does what it needs to.  There is no visible need for additional
+functionality, the library is stable and in use.
 
-It will then be declared 1.0 and will not change further unless TAP, or
-Zig, require it to.  No changes to the interface at any of these points
-are likely.
+The only contemplated change is in the event that Zig does add a TODO
+type error to the test system.  In that event, ZTAP will support both,
+with a deprecation notice for `error.ZTapTodo`, and the custom error
+will be removed in 1.0.
+
+Speaking of 1.0, an earlier version of the README suggested that ZTAP
+would declare 1.0 under conditions which have in fact been achieved.
+However, changes to the panic handling in Zig 0.14 required ZTAP to
+make changes to its public interface.  In recognition of this, ZTAP
+will not declare a 1.0 edition before Zig itself does.
+
+However, the only breaking changes I will countenance are those needed
+to keep up with changes in Zig.  Other than that, consider ZTAP to have
+reached release status.
 
 ### Why Though?
 
