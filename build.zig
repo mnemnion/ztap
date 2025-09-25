@@ -12,8 +12,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    _ = ztap_module; // autofix
-
     b.addNamedLazyPath("runner", b.path("src/ztap-runner.zig"));
 
     const test_filters = b.option(
@@ -23,9 +21,7 @@ pub fn build(b: *std.Build) void {
     ) orelse &[0][]const u8{};
 
     const module_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/ztap.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = ztap_module,
         .filters = test_filters,
     });
 

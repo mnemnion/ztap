@@ -14,7 +14,7 @@ const std = @import("std");
 pub const ZTapTodo = error.ZTapTodo;
 const SkipZigTest = error.SkipZigTest;
 
-var current_test: ?[]const u8 = null;
+threadlocal var current_test: ?[]const u8 = null;
 
 /// ZTAP test producer.  Call with `ztap_test(builtin)` in the main
 /// function of a test executable, followed by `std.process.exit(0)`.
