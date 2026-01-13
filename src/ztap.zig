@@ -21,7 +21,9 @@ threadlocal var current_test: ?[]const u8 = null;
 /// Set `pub fn panic = ztap.ztap_panic` for TAP-compatible bailout
 /// behavior.
 pub fn ztap_test(builtin: anytype) void {
-    const stdout = std.io.getStdOut().writer();
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    var stdout = &stdout_writer.interface;
     // Version string.
     _ = stdout.writeAll("\nTAP version 14\n") catch 0;
     // Make sure we have tests to run.
@@ -70,6 +72,7 @@ pub fn ztap_test(builtin: anytype) void {
         }
     }
     current_test = null;
+    stdout.flush() catch {};
 }
 
 fn esc_print(stdout: anytype, msg: []const u8) void {
@@ -94,7 +97,9 @@ pub fn ztap_panic(
     message: []const u8,
     ret_addr: ?usize,
 ) noreturn {
-    const stdout = std.io.getStdOut().writer();
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    var stdout = &stdout_writer.interface;
     std.debug.print("panic! at the ztap\n", .{});
     const current = if (current_test != null) current_test.? else "pre/post";
     stdout.print("# panic in {s}: {s}\n", .{ current, message }) catch {};

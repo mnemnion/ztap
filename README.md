@@ -54,16 +54,14 @@ default test runner, and make this a custom step.
     ) orelse &.{};
 
     const ztap_dep = b.dependency("ztap", .{
-        .target = target,
+        .target = b.graph.host, // Runs on host!
         .optimize = optimize,
     });
 
     // ZTAP test runner step.
     const ztap_unit_tests = b.addTest(.{
         .name = "ztap-run",
-        .root_source_file = b.path("src/test-root-file.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = module_to_test,
         .filters = test_filters,
         // With the provided test runner:
         .test_runner = .{ .path = ztap_dep.namedLazyPath("runner"), .mode = .simple},
