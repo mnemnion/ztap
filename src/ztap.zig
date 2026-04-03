@@ -70,6 +70,7 @@ pub fn ztap_test(builtin: anytype) void {
                 stdout.print(": {any}\n", .{err}) catch {};
             },
         }
+        stdout.flush() catch {};
     }
     current_test = null;
     stdout.flush() catch {};
