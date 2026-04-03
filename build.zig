@@ -12,6 +12,14 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const ztap_opts = b.addOptions();
+    ztap_opts.addOption(bool, "timed", b.option(
+        bool,
+        "timed",
+        "time each run and print a timing comment for each test",
+    ) orelse false);
+    ztap_module.addOptions("options", ztap_opts);
+
     b.addNamedLazyPath("runner", b.path("src/ztap-runner.zig"));
 
     const test_filters = b.option(
