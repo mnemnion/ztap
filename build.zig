@@ -18,6 +18,11 @@ pub fn build(b: *std.Build) void {
         "timed",
         "time each run and print a timing comment for each test",
     ) orelse false);
+    ztap_opts.addOption(bool, "threaded", b.option(
+        bool,
+        "threaded",
+        "run tests on multiple threads and emit TAP lines in completion order",
+    ) orelse false);
     ztap_module.addOptions("options", ztap_opts);
 
     b.addNamedLazyPath("runner", b.path("src/ztap-runner.zig"));

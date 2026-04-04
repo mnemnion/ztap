@@ -8,7 +8,7 @@ format.
 
 ## Compatibility
 
-ZTAP requires Zig 0.14.
+ZTAP requires Zig 0.15.2.
 
 ## Use
 
