@@ -52,6 +52,9 @@ pub fn ztap_test(builtin: anytype) void {
     const threaded_run = shouldRunThreaded(builtin.test_functions.len);
     const total_tests = builtin.test_functions.len + @intFromBool(threaded_run);
     stdout.print("1..{d}\n", .{total_tests}) catch {};
+    if (timed) {
+        stdout.writeAll("pragma +timed\n") catch {};
+    }
     stdout.flush() catch {};
 
     if (threaded_run) {
@@ -298,12 +301,6 @@ fn writeTestChunk(
     leaked: bool,
 ) void {
     @disableInstrumentation();
-    if (timing_ns) |ns| {
-        stdout.print("# {}: ", .{i}) catch {};
-        fmtDuration(ns, stdout) catch {};
-        stdout.writeByte('\n') catch {};
-    }
-
     if (leaked) {
         stdout.print("not ok {d} - {s}: memory leak\n", .{ i, name }) catch {};
         return;
@@ -329,6 +326,11 @@ fn writeTestChunk(
             esc_print(stdout, name);
             stdout.print(": {any}\n", .{err}) catch {};
         },
+    }
+    if (timing_ns) |ns| {
+        stdout.print("---\n  time: ", .{}) catch {};
+        fmtDuration(ns, stdout) catch {};
+        stdout.print(" # {d}\n...\n", .{i}) catch {};
     }
 }
 
