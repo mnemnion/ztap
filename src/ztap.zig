@@ -27,6 +27,7 @@ threadlocal var current_test: ?[]const u8 = null;
 /// Set `pub fn panic = ztap.ztap_panic` for TAP-compatible bailout
 /// behavior.
 pub fn ztap_test(builtin: anytype) void {
+    @disableInstrumentation();
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     var stdout = &stdout_writer.interface;
@@ -64,6 +65,7 @@ pub fn ztap_test(builtin: anytype) void {
 }
 
 fn runSequential(builtin: anytype, stdout: anytype) void {
+    @disableInstrumentation();
     var time: std.time.Timer = undefined;
     if (timed) {
         time = std.time.Timer.start() catch unreachable;
@@ -84,6 +86,7 @@ fn runSequential(builtin: anytype, stdout: anytype) void {
 }
 
 fn runThreaded(builtin: anytype, stdout: anytype) void {
+    @disableInstrumentation();
     const tests = builtin.test_functions;
     const worker_count = @min(tests.len, std.Thread.getCpuCount() catch 1);
 
@@ -202,6 +205,7 @@ const ThreadedCoordinator = struct {
     slots: []ThreadedSlot,
 
     fn publish(coord: *ThreadedCoordinator, slot: *ThreadedSlot) void {
+        @disableInstrumentation();
         coord.mutex.lock();
         defer coord.mutex.unlock();
 
@@ -217,6 +221,7 @@ const ThreadedCoordinator = struct {
     }
 
     fn waitForTicket(coord: *ThreadedCoordinator, ticket: usize) usize {
+        @disableInstrumentation();
         coord.mutex.lock();
         defer coord.mutex.unlock();
 
@@ -232,6 +237,7 @@ const ThreadedCoordinator = struct {
     }
 
     fn acknowledge(coord: *ThreadedCoordinator, slot: *ThreadedSlot) void {
+        @disableInstrumentation();
         coord.mutex.lock();
         defer coord.mutex.unlock();
 
@@ -243,6 +249,7 @@ const ThreadedCoordinator = struct {
 };
 
 fn esc_print(stdout: anytype, msg: []const u8) void {
+    @disableInstrumentation();
     var cursor: usize = 0;
     var idx: usize = 0;
     while (idx < msg.len) : (idx += 1) {
@@ -259,6 +266,7 @@ fn esc_print(stdout: anytype, msg: []const u8) void {
 }
 
 fn partitionRange(idx: usize, parts: usize, len: usize) TestRange {
+    @disableInstrumentation();
     std.debug.assert(parts > 0);
     std.debug.assert(idx < parts);
 
@@ -289,6 +297,7 @@ fn writeTestChunk(
     timing_ns: ?u64,
     leaked: bool,
 ) void {
+    @disableInstrumentation();
     if (timing_ns) |ns| {
         stdout.print("# {}: ", .{i}) catch {};
         fmtDuration(ns, stdout) catch {};
@@ -324,6 +333,7 @@ fn writeTestChunk(
 }
 
 fn writeLeakCheckChunk(stdout: anytype, i: usize, leaked: bool) void {
+    @disableInstrumentation();
     if (leaked) {
         stdout.print("not ok {d} - {s}: memory leak\n", .{ i, threaded_leak_name }) catch {};
     } else {
@@ -335,6 +345,7 @@ fn writeLeakCheckChunk(stdout: anytype, i: usize, leaked: bool) void {
 
 /// Format a nice duration
 fn fmtDuration(ns: u64, w: anytype) !void {
+    @disableInstrumentation();
     const t = std.time;
 
     if (ns < t.ns_per_us) {
@@ -350,6 +361,7 @@ fn fmtDuration(ns: u64, w: anytype) !void {
 
 /// Scale-round approximates and drop decimal.
 fn fmtScaled(ns: u64, unit: u64, suffix: []const u8, w: anytype) !void {
+    @disableInstrumentation();
     // integer part
     const whole = ns / unit;
 
