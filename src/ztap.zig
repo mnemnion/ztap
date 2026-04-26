@@ -10,26 +10,31 @@
 //! anywhere TAP is spoken.
 
 const std = @import("std");
-const zig_builtin = @import("builtin");
+const runner_builtin = @import("builtin");
 const options = @import("options");
 const threaded = options.threaded;
 const timed = options.timed;
 
+/// ZTAP-specific error for TAP-style #Todo
 pub const ZTapTodo = error.ZTapTodo;
 const SkipZigTest = error.SkipZigTest;
 const invalid_ticket = std.math.maxInt(usize);
 const threaded_leak_name = "ztap_runner.threaded tests don't leak memory";
 
+/// Current per-thread test, for panic / bail out
 threadlocal var current_test: ?[]const u8 = null;
+/// Io instance for panic / bail out
+var runtime_io: ?std.Io = null;
 
-/// ZTAP test producer.  Call with `ztap_test(builtin)` in the main
+/// ZTAP test producer.  Call with `ztap_test(io, builtin)` in the main
 /// function of a test executable, followed by `std.process.exit(0)`.
 /// Set `pub fn panic = ztap.ztap_panic` for TAP-compatible bailout
 /// behavior.
-pub fn ztap_test(builtin: anytype) void {
+pub fn ztap_test(io: std.Io, builtin: anytype) void {
     @disableInstrumentation();
+    runtime_io = io;
     var stdout_buffer: [1024]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     var stdout = &stdout_writer.interface;
 
     // Version string.
@@ -58,29 +63,29 @@ pub fn ztap_test(builtin: anytype) void {
     stdout.flush() catch {};
 
     if (threaded_run) {
-        runThreaded(builtin, stdout);
+        runThreaded(io, builtin, stdout);
     } else {
-        runSequential(builtin, stdout);
+        runSequential(io, builtin, stdout);
     }
 
     current_test = null;
     stdout.flush() catch {};
 }
 
-fn runSequential(builtin: anytype, stdout: anytype) void {
+fn runSequential(io: std.Io, builtin: anytype, stdout: anytype) void {
     @disableInstrumentation();
-    var time: std.time.Timer = undefined;
-    if (timed) {
-        time = std.time.Timer.start() catch unreachable;
-    }
+    var started: std.Io.Timestamp = undefined;
 
     for (builtin.test_functions, 1..) |t, i| {
         current_test = t.name;
         std.testing.allocator_instance = .{};
-        if (timed) time.reset();
+        if (timed) started = std.Io.Timestamp.now(io, .awake);
 
         const result = t.func();
-        const timing_ns: ?u64 = if (timed) time.lap() else null;
+        const timing_ns: ?u64 = if (timed)
+            @intCast(started.untilNow(io, .awake).nanoseconds)
+        else
+            null;
         const leaked = std.testing.allocator_instance.deinit() == .leak;
 
         writeTestChunk(stdout, i, t.name, result, timing_ns, leaked);
@@ -88,7 +93,7 @@ fn runSequential(builtin: anytype, stdout: anytype) void {
     }
 }
 
-fn runThreaded(builtin: anytype, stdout: anytype) void {
+fn runThreaded(io: std.Io, builtin: anytype, stdout: anytype) void {
     @disableInstrumentation();
     const tests = builtin.test_functions;
     const worker_count = @min(tests.len, std.Thread.getCpuCount() catch 1);
@@ -101,24 +106,30 @@ fn runThreaded(builtin: anytype, stdout: anytype) void {
         start_index: usize,
         slot: *ThreadedSlot,
         coord: *ThreadedCoordinator,
-        allocator: std.mem.Allocator,
+        io: std.Io,
 
         fn run(worker: *@This()) void {
-            var time: std.time.Timer = undefined;
-            if (timed) {
-                time = std.time.Timer.start() catch unreachable;
-            }
+            var started: std.Io.Timestamp = undefined;
+            var buffer: std.ArrayList(u8) = .empty;
+            defer buffer.deinit(std.heap.page_allocator);
 
             for (worker.tests, worker.start_index + 1..) |t, i| {
                 current_test = t.name;
-                if (timed) time.reset();
+                if (timed) started = std.Io.Timestamp.now(worker.io, .awake);
 
                 const result = t.func();
-                const timing_ns: ?u64 = if (timed) time.lap() else null;
+                const timing_ns: ?u64 = if (timed)
+                    @intCast(started.untilNow(worker.io, .awake).nanoseconds)
+                else
+                    null;
 
-                worker.slot.buffer.clearRetainingCapacity();
-                var writer = worker.slot.buffer.writer(worker.allocator);
-                writeTestChunk(&writer, i, t.name, result, timing_ns, false);
+                buffer.clearRetainingCapacity();
+                {
+                    var writer: std.Io.Writer.Allocating = .fromArrayList(std.heap.page_allocator, &buffer);
+                    writeTestChunk(&writer.writer, i, t.name, result, timing_ns, false);
+                    buffer = writer.toArrayList();
+                }
+                worker.slot.buffer = buffer.items;
                 worker.coord.publish(worker.slot);
             }
 
@@ -129,11 +140,8 @@ fn runThreaded(builtin: anytype, stdout: anytype) void {
     const slots = allocator.alloc(ThreadedSlot, worker_count) catch unreachable;
     defer allocator.free(slots);
     for (slots) |*slot| {
-        slot.* = ThreadedSlot.init(allocator);
+        slot.* = ThreadedSlot.init();
     }
-    defer for (slots) |*slot| {
-        slot.deinit(allocator);
-    };
 
     const workers = allocator.alloc(Worker, worker_count) catch unreachable;
     defer allocator.free(workers);
@@ -144,6 +152,7 @@ fn runThreaded(builtin: anytype, stdout: anytype) void {
     std.testing.allocator_instance = .{};
 
     var coord = ThreadedCoordinator{
+        .io = io,
         .slots = slots,
     };
 
@@ -154,7 +163,7 @@ fn runThreaded(builtin: anytype, stdout: anytype) void {
             .start_index = range.start,
             .slot = &slots[idx],
             .coord = &coord,
-            .allocator = allocator,
+            .io = io,
         };
         thread.* = std.Thread.spawn(.{
             .allocator = allocator,
@@ -165,7 +174,7 @@ fn runThreaded(builtin: anytype, stdout: anytype) void {
         const slot_index = coord.waitForTicket(ticket);
         const slot = &slots[slot_index];
 
-        stdout.writeAll(slot.buffer.items) catch {};
+        stdout.writeAll(slot.buffer) catch {};
         stdout.flush() catch {};
         coord.acknowledge(slot);
     }
@@ -184,49 +193,45 @@ const TestRange = struct {
 };
 
 const ThreadedSlot = struct {
-    buffer: std.ArrayList(u8),
+    buffer: []const u8,
     ready: bool = false,
     ticket: usize = invalid_ticket,
-    written: std.Thread.Condition = .{},
+    written: std.Io.Condition = .init,
 
-    fn init(allocator: std.mem.Allocator) ThreadedSlot {
-        _ = allocator;
+    fn init() ThreadedSlot {
         return .{
-            .buffer = .empty,
+            .buffer = &.{},
         };
-    }
-
-    fn deinit(slot: *ThreadedSlot, allocator: std.mem.Allocator) void {
-        slot.buffer.deinit(allocator);
     }
 };
 
 const ThreadedCoordinator = struct {
-    mutex: std.Thread.Mutex = .{},
-    ready: std.Thread.Condition = .{},
+    io: std.Io,
+    mutex: std.Io.Mutex = .init,
+    ready: std.Io.Condition = .init,
     next_ticket: usize = 0,
     slots: []ThreadedSlot,
 
     fn publish(coord: *ThreadedCoordinator, slot: *ThreadedSlot) void {
         @disableInstrumentation();
-        coord.mutex.lock();
-        defer coord.mutex.unlock();
+        coord.mutex.lockUncancelable(coord.io);
+        defer coord.mutex.unlock(coord.io);
 
         std.debug.assert(!slot.ready);
         slot.ticket = coord.next_ticket;
         coord.next_ticket += 1;
         slot.ready = true;
 
-        coord.ready.signal();
+        coord.ready.signal(coord.io);
         while (slot.ready) {
-            slot.written.wait(&coord.mutex);
+            slot.written.waitUncancelable(coord.io, &coord.mutex);
         }
     }
 
     fn waitForTicket(coord: *ThreadedCoordinator, ticket: usize) usize {
         @disableInstrumentation();
-        coord.mutex.lock();
-        defer coord.mutex.unlock();
+        coord.mutex.lockUncancelable(coord.io);
+        defer coord.mutex.unlock(coord.io);
 
         while (true) {
             for (coord.slots, 0..) |*slot, idx| {
@@ -235,19 +240,19 @@ const ThreadedCoordinator = struct {
                 }
             }
 
-            coord.ready.wait(&coord.mutex);
+            coord.ready.waitUncancelable(coord.io, &coord.mutex);
         }
     }
 
     fn acknowledge(coord: *ThreadedCoordinator, slot: *ThreadedSlot) void {
         @disableInstrumentation();
-        coord.mutex.lock();
-        defer coord.mutex.unlock();
+        coord.mutex.lockUncancelable(coord.io);
+        defer coord.mutex.unlock(coord.io);
 
         std.debug.assert(slot.ready);
         slot.ready = false;
         slot.ticket = invalid_ticket;
-        slot.written.signal();
+        slot.written.signal(coord.io);
     }
 };
 
@@ -285,7 +290,7 @@ fn partitionRange(idx: usize, parts: usize, len: usize) TestRange {
 }
 
 fn shouldRunThreaded(test_count: usize) bool {
-    if (!threaded or zig_builtin.single_threaded or test_count == 0) {
+    if (!threaded or runner_builtin.single_threaded or test_count == 0) {
         return false;
     }
 
@@ -391,13 +396,15 @@ pub fn ztap_panic(
     message: []const u8,
     ret_addr: ?usize,
 ) noreturn {
-    var stdout_buffer: [1024]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
-    var stdout = &stdout_writer.interface;
-    std.debug.print("panic! at the ztap\n", .{});
-    const current = if (current_test != null) current_test.? else "pre/post";
-    stdout.print("# panic in {s}: {s}\n", .{ current, message }) catch {};
-    _ = stdout.writeAll("Bail out!\n") catch 0;
+    if (runtime_io) |io| {
+        var stdout_buffer: [1024]u8 = undefined;
+        var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+        var stdout = &stdout_writer.interface;
+        const current = if (current_test != null) current_test.? else "pre/post";
+        stdout.print("# panic in {s}: {s}\n", .{ current, message }) catch {};
+        stdout.writeAll("Bail out!\n") catch {};
+        stdout.flush() catch {};
+    }
     std.debug.defaultPanic(message, ret_addr);
 }
 

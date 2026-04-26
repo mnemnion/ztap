@@ -36,13 +36,24 @@ pub fn build(b: *std.Build) void {
     const module_unit_tests = b.addTest(.{
         .root_module = ztap_module,
         .filters = test_filters,
+        .test_runner = .{
+            .path = b.path("src/ztap-runner.zig"),
+            .mode = .simple,
+        },
     });
+    module_unit_tests.root_module.addImport("ztap", ztap_module);
+    b.installArtifact(module_unit_tests);
 
     const run_module_unit_tests = b.addRunArtifact(module_unit_tests);
 
     const test_step = b.step("test", "Run unit tests");
 
     test_step.dependOn(&run_module_unit_tests.step);
+
+    const coverage_unit_tests = b.addTest(.{
+        .root_module = ztap_module,
+        .filters = test_filters,
+    });
 
     const run_kcov = b.addSystemCommand(&.{
         "kcov",
@@ -51,7 +62,7 @@ pub fn build(b: *std.Build) void {
     });
     run_kcov.addPrefixedDirectoryArg("--include-pattern=", b.path("."));
     const coverage_output = run_kcov.addOutputDirectoryArg(".");
-    run_kcov.addArtifactArg(module_unit_tests);
+    run_kcov.addArtifactArg(coverage_unit_tests);
 
     run_kcov.enableTestRunnerMode();
 
