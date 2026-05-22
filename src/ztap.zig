@@ -59,6 +59,7 @@ pub fn ztap_test(io: std.Io, builtin: anytype) void {
     stdout.print("1..{d}\n", .{total_tests}) catch {};
     if (timed) {
         stdout.writeAll("pragma +timed\n") catch {};
+        stdout.print("# mode: {t}\n", .{builtin.mode}) catch {};
     }
     stdout.flush() catch {};
 
