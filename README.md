@@ -8,7 +8,7 @@ format.
 
 ## Compatibility
 
-ZTAP requires Zig 0.16.0.
+ZTAP requires Zig 0.17.1.
 
 ## Use
 
@@ -19,7 +19,7 @@ former case.
 Add to `build.zig.zon` in the usual fashion:
 
 ```sh
-zig fetch --save "https://github.com/mnemnion/ztap/archive/refs/tags/v0.9.6.tar.gz"
+zig fetch --save "https://github.com/mnemnion/ztap/archive/refs/tags/v0.9.8.tar.gz"
 ```
 You'll need a test runner.  A default one is included, and looks like this:
 

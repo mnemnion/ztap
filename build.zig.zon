@@ -2,7 +2,7 @@
 .{
     .name = .ztap,
 
-    .version = "0.9.6",
+    .version = "0.9.8",
 
     .minimum_zig_version = "0.17.1",
 
