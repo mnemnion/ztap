@@ -58,9 +58,9 @@ pub fn build(b: *std.Build) void {
     const run_kcov = b.addSystemCommand(&.{
         "kcov",
         "--clean",
-        "--exclude-line=unreachable,expect(false)",
+        "--exclude-line=unreachable,expect(false),@panic,kcov-defer-error,kcov-test-cleanup,kcov-miss",
     });
-    run_kcov.addPrefixedDirectoryArg("--include-pattern=", b.path("."));
+    run_kcov.addDirectoryArg2(b.path("src"), .{ .prefix = "--include-pattern=", .make_absolute = true });
     const coverage_output = run_kcov.addOutputDirectoryArg(".");
     run_kcov.addArtifactArg(coverage_unit_tests);
 

@@ -79,7 +79,7 @@ fn runSequential(io: std.Io, builtin: anytype, stdout: anytype) void {
 
     for (builtin.test_functions, 1..) |t, i| {
         current_test = t.name;
-        std.testing.allocator_instance = .{};
+        std.testing.allocator_instance = .init(std.heap.page_allocator, .{ .canary = 0xc3a701ba, .check_write_after_free = true });
         if (timed) started = std.Io.Timestamp.now(io, .awake);
 
         const result = t.func();
@@ -87,7 +87,7 @@ fn runSequential(io: std.Io, builtin: anytype, stdout: anytype) void {
             @intCast(started.untilNow(io, .awake).nanoseconds)
         else
             null;
-        const leaked = std.testing.allocator_instance.deinit() == .leak;
+        const leaked = std.testing.allocator_instance.deinit() != 0;
 
         writeTestChunk(stdout, i, t.name, result, timing_ns, leaked);
         stdout.flush() catch {};
@@ -150,7 +150,7 @@ fn runThreaded(io: std.Io, builtin: anytype, stdout: anytype) void {
     const threads = allocator.alloc(std.Thread, worker_count) catch unreachable;
     defer allocator.free(threads);
 
-    std.testing.allocator_instance = .{};
+    std.testing.allocator_instance = .init(std.heap.page_allocator, .{ .canary = 0xc3a701ba, .check_write_after_free = true });
 
     var coord = ThreadedCoordinator{
         .io = io,
@@ -184,7 +184,7 @@ fn runThreaded(io: std.Io, builtin: anytype, stdout: anytype) void {
         thread.join();
     }
 
-    const leaked = std.testing.allocator_instance.deinit() == .leak;
+    const leaked = std.testing.allocator_instance.deinit() != 0;
     writeLeakCheckChunk(stdout, tests.len + 1, leaked);
     stdout.flush() catch {};
 }
